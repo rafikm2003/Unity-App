@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: unityhotswap-db
+    environment:
+      POSTGRES_DB: unityhotswap
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - unityhotswap_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d unityhotswap"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./UnityHotSwap/src/CompilerHost
+      dockerfile: Dockerfile
+    container_name: unityhotswap-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: Host=db;Port=5432;Database=unityhotswap;Username=postgres;Password=postgres
+      Jwt__Issuer: UnityHotSwap.CompilerHost
+      Jwt__Audience: UnityHotSwap.Frontend
+      Jwt__Key: CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS
+    ports:
+      - "5000:5000"
+
+  frontend:
+    build:
+      context: ./UnityHotSwap-Frontend
+      dockerfile: Dockerfile
+    container_name: unityhotswap-frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE: http://localhost:5000
+    ports:
+      - "5173:5173"
+
+volumes:
+  unityhotswap_pgdata:
